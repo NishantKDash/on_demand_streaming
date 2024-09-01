@@ -3,6 +3,7 @@ package com.nishant.stream.services;
 import org.apache.logging.slf4j.SLF4JLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
@@ -19,24 +20,15 @@ import java.util.Map;
 @Service
 public class UrlService {
 
-    @Value("${aws.region}")
-    private String region;
-
     private Logger logger = LoggerFactory.getLogger(SLF4JLogger.class);
-    private  S3Client s3Client;
-    private  S3Presigner presigner;
+    private  final S3Client s3Client;
+    private  final S3Presigner presigner;
 
-    public UrlService()
+    @Autowired
+    public UrlService(S3Client s3Client, S3Presigner s3Presigner)
     {
-        this.s3Client = S3Client.builder()
-                .region(Region.AP_SOUTH_1)
-                .credentialsProvider(ProfileCredentialsProvider.create())
-                .build();
-
-        this.presigner = S3Presigner.builder()
-                .region(Region.AP_SOUTH_1)
-                .credentialsProvider(ProfileCredentialsProvider.create())
-                .build();
+         this.s3Client = s3Client;
+         this.presigner = s3Presigner;
     }
 
     /* Create a presigned URL to use in a subsequent PUT request */
