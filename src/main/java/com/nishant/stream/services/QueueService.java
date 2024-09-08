@@ -3,6 +3,7 @@ package com.nishant.stream.services;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nishant.stream.models.Owner;
 import com.nishant.stream.models.Video;
 import com.nishant.stream.repositories.OwnerRepository;
@@ -66,8 +67,8 @@ public class QueueService {
         }
     }
 
-    public void processMessage(List<Message> messages){
-        messages.forEach(m ->{
+    public void processMessage(List<Message> messages) {
+        messages.forEach(m -> {
             String body = m.body();
             try {
                 JsonNode root = objectMapper.readTree(body);
@@ -78,7 +79,8 @@ public class QueueService {
                     String objectKey = s3Node.path("object").path("key").asText();
                     Optional<Owner> owner = ownerRepository.findById(1L);
                     Video video = new Video(owner.get(), objectKey, bucketName);
-                    videoRepository.save(video);
+                    Video savedVideo = videoRepository.save(video);
+                    sendMessage(savedVideo.getId().toString(), savedVideo.getBucket(), savedVideo.getS3Path());
                 }
                 DeleteMessageRequest deleteMessageRequest = DeleteMessageRequest.builder()
                         .queueUrl(getQueueUrl(queue1))
@@ -89,5 +91,24 @@ public class QueueService {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+
+    public void sendMessage(String id, String bucket, String path) {
+        ObjectNode messageBody = objectMapper.createObjectNode();
+        messageBody.put("videoId", id);
+        messageBody.put("sourceBucket", bucket);
+        messageBody.put("sourcePath", path);
+        SendMessageBatchRequestEntry messageBatchRequestEntry = SendMessageBatchRequestEntry.builder()
+                .id(id)
+                .messageBody(messageBody.toString())
+                .delaySeconds(10)
+                .build();
+
+        SendMessageBatchRequest sendMessageBatchRequest = SendMessageBatchRequest.builder()
+                .queueUrl(getQueueUrl(queue2))
+                .entries(messageBatchRequestEntry)
+                .build();
+        sqsClient.sendMessageBatch(sendMessageBatchRequest);
     }
 }
